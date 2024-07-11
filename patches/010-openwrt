@@ -1,0 +1,162 @@
+--- a/privoxy-blocklist.sh
++++ b/privoxy-blocklist.sh
+@@ -60,7 +60,6 @@ function usage() {
+     echo " "
+     echo "Options:"
+     echo "      -h:         Show this help."
+-    echo "      -c:         Path to script configuration file. (default = ${SCRIPTCONF} - OS specific)"
+     echo "      -f filter:  only activate given content filter, can be used multiple times. (default: empty, content-filter disabled)"
+     echo "                  Supported values: ${FILTERTYPES[*]}"
+     echo "      -q:         Don't give any output."
+@@ -87,17 +86,18 @@ function activate_config() {
+             ;;
+     esac
+     copy "${file_path}" "${PRIVOXY_DIR}"
+-    if ! grep -q "${file_name}" "${PRIVOXY_CONF}"; then
+-        debug 0 "Modifying ${PRIVOXY_CONF} ..."
+-        # ensure generated config is above user.* to allow overriding
+-        if [ "${OS_FLAVOR}" = "openwrt" ]; then
+-            sed "s%^\(\s*#*\s*list\s\s*${option}\s\s*'user\.${file_type}'\)%\tlist\t${option}\t'${PRIVOXY_DIR}/${file_name}'\n\1%" "${PRIVOXY_CONF}" > "${TMPDIR}/config"
+-        else
+-            sed "s/^\(#*\s*${option} user\.${file_type}\)/${option} ${file_name}\n\1/" "${PRIVOXY_CONF}" > "${TMPDIR}/config"
++    if [ "${OS_FLAVOR}" = "openwrt" ]; then
++        if ! grep -q "${file_name}" /etc/config/privoxy; then
++            sed -i "s%^\(\s*#*\s*list\s\s*${option}\s\s*'default\.${file_type}'\)%\slist\s${option}\t'${file_name}'\n\1%" "/etc/config/privoxy"
+         fi
++    fi
++    if test -f "${PRIVOXY_CONF}" && ! grep -q "${file_name}" "${PRIVOXY_CONF}"; then
++        debug 0 "Modifying ${PRIVOXY_CONF} ..."
++        # ensure generated config is above default.* to allow overriding
++       	sed "s/^\(#*\s*${option}\s*default\.${file_type}\)/${option}\t${file_name}\n\1/" "${PRIVOXY_CONF}" > "${TMPDIR}/config" 2> /dev/null
+         debug 0 "... modification done."
+         debug 0 "Installing new config ..."
+-        copy "${TMPDIR}/config" "${PRIVOXY_CONF}"
++       	copy "${TMPDIR}/config" "${PRIVOXY_CONF}" 2> /dev/null
+         debug 0 "... installation done"
+     fi
+ }
+@@ -129,7 +129,7 @@ function get_config_path() {
+                 ;;
+         esac
+         if [ "${OS_FLAVOR}" = "openwrt" ]; then
+-            SCRIPTCONF="/etc/config/privoxy-blocklist.conf"
++            SCRIPTCONF="/etc/config/privoxy-blocklist"
+         fi
+         # backwards compatibility
+         if [ -f "/etc/conf.d/privoxy-blacklist" ]; then
+@@ -205,41 +205,30 @@ function prepare() {
+     if [[ ! -f "${SCRIPTCONF}" ]]; then
+         info "No config found in ${SCRIPTCONF}. Creating default one and exiting because you might have to adjust it."
+         cat > "${SCRIPTCONF}" << EOF
+-# Config of privoxy-blocklist
+ 
+-# array of URL for AdblockPlus lists
+-#  for more sources just add it within the round brackets
+-URLS=(
+-  "https://easylist-downloads.adblockplus.org/easylistgermany.txt"
+-  "https://easylist-downloads.adblockplus.org/easylist.txt"
+-)
+-
+-# array of content filters to convert
+-#   for supported values check: $0 -h
+-#   empty by default to deactivate as content filters slowdown privoxy a lot
+-FILTERS=()
+-
+-# config for privoxy initscript providing PRIVOXY_CONF, PRIVOXY_USER and PRIVOXY_GROUP
+-INIT_CONF="/etc/conf.d/privoxy"
+-
+-# !! set these when config INIT_CONF doesn't exist and default values do not match your system !!
+-# !! These values will be overwritten by INIT_CONF when exists !!
+-#PRIVOXY_USER="privoxy"
+-#PRIVOXY_GROUP="root"
+-#PRIVOXY_CONF="/etc/privoxy/config"
+-
+-# name for lock file (default: script name)
+-TMPNAME="\$(basename "\$(readlink -f "\${0}")")"
+-# directory for temporary files
+-TMPDIR="/tmp/\${TMPNAME}"
+-
+-# Debug-level
+-#   -1 = quiet
+-#    0 = normal
+-#    1 = verbose
+-#    2 = more verbose (debugging)
+-#    3 = incredibly loud (function debugging)
+-DBG=0
++config blocklist 'blocklist'
++	# array of URL for AdblockPlus lists
++	#  for more sources just add it within the round brackets
++	list URLS 'https://easylist-downloads.adblockplus.org/easylistgermany.txt'
++	list URLS 'https://easylist-downloads.adblockplus.org/easylist.txt'
++
++	# array of content filters to convert
++	#   for supported values check: $0 -h
++	#   empty by default to deactivate as content filters slowdown privoxy a lot
++	#list FILTERS ''
++
++	option PRIVOXY_USER 'root'
++	option PRIVOXY_GROUP 'root'
++	option PRIVOXY_CONF '/var/etc/privoxy.conf'
++
++	# Debug-level
++	#   -1 = quiet
++	#    0 = normal
++	#    1 = verbose
++	#    2 = more verbose (debugging)
++	#    3 = incredibly loud (function debugging)
++	option DBG '0'
++
+ EOF
+         exit 2
+     fi
+@@ -248,8 +237,17 @@ EOF
+         debug -1 "Can't read ${SCRIPTCONF}. Permission denied."
+     fi
+ 
++    # read configuration from UCI:
++    TMPNAME="$(basename "$0")"
++    TMPDIR="/tmp/${TMPNAME}"
++    URLS=($(uci -q get privoxy-blocklist.blocklist.URLS || true))
++    FILTERS=($(uci -q get privoxy-blocklist.blocklist.FILTERS || true))
++    PRIVOXY_USER="$(uci -q get privoxy-blocklist.blocklist.PRIVOXY_USER || echo 'root')"
++    PRIVOXY_GROUP="$(uci -q get privoxy-blocklist.blocklist.PRIVOXY_GROUP || echo 'root')"
++    PRIVOXY_CONF="$(uci -q get privoxy-blocklist.blocklist.PRIVOXY_CONF || echo 'PRIVOXY_CONF')"
++    DBG=$(uci -q get privoxy-blocklist.blocklist.DBG || echo "0")
++
+     # shellcheck disable=SC1090
+-    source "${SCRIPTCONF}"
+     if [ -n "${OPT_DBG:-}" ]; then
+         DBG="${OPT_DBG}"
+     fi
+@@ -258,12 +256,6 @@ EOF
+     fi
+     debug 2 "Content filters: ${OPT_FILTERS[*]:-disabled}"
+ 
+-    # load privoxy config
+-    # shellcheck disable=SC1090
+-    if [[ -r "${INIT_CONF:-no-init-conf}" ]]; then
+-        source "${INIT_CONF}"
+-    fi
+-
+     # set command to be run on exit
+     if [ "${DBG}" -gt 2 ]; then
+         trap - INT TERM EXIT
+@@ -291,7 +283,7 @@ EOF
+     fi
+ 
+     # set privoxy config dir
+-    PRIVOXY_DIR="$(dirname "${PRIVOXY_CONF}")"
++    PRIVOXY_DIR="/etc/privoxy"
+ }
+ 
+ function debug() {
+@@ -852,9 +844,6 @@ esac
+ # loop for options
+ while getopts ":c:f:hrqv:V" opt; do
+     case "${opt}" in
+-        "c")
+-            SCRIPTCONF="${OPTARG}"
+-            ;;
+         "f")
+             OPT_FILTERS+=("${OPTARG,,}")
+             ;;

@@ -1,0 +1,23 @@
+
+config blocklist 'blocklist'
+	# array of URL for AdblockPlus lists
+	#  for more sources just add it within the round brackets
+	list URLS 'https://easylist-downloads.adblockplus.org/easylistgermany.txt'
+	list URLS 'https://easylist-downloads.adblockplus.org/easylist.txt'
+
+	# array of content filters to convert
+	#   for supported values check: $0 -h
+	#   empty by default to deactivate as content filters slowdown privoxy a lot
+	#list FILTERS ''
+
+	option PRIVOXY_USER 'root'
+	option PRIVOXY_GROUP 'root'
+	option PRIVOXY_CONF '/var/etc/privoxy.conf'
+
+	# Debug-level
+	#   -1 = quiet
+	#    0 = normal
+	#    1 = verbose
+	#    2 = more verbose (debugging)
+	#    3 = incredibly loud (function debugging)
+	option DBG '0'
