@@ -8,10 +8,11 @@
      echo "      -f filter:  only activate given content filter, can be used multiple times. (default: empty, content-filter disabled)"
      echo "                  Supported values: ${FILTERTYPES[*]}"
      echo "      -q:         Don't give any output."
-@@ -87,17 +86,18 @@ function activate_config() {
+@@ -86,15 +85,15 @@ function activate_config() {
+             option="filterfile"
              ;;
      esac
-     copy "${file_path}" "${PRIVOXY_DIR}"
+-    copy "${file_path}" "${PRIVOXY_DIR}"
 -    if ! grep -q "${file_name}" "${PRIVOXY_CONF}"; then
 -        debug 0 "Modifying ${PRIVOXY_CONF} ..."
 -        # ensure generated config is above user.* to allow overriding
@@ -21,7 +22,7 @@
 -            sed "s/^\(#*\s*${option} user\.${file_type}\)/${option} ${file_name}\n\1/" "${PRIVOXY_CONF}" > "${TMPDIR}/config"
 +    if [ "${OS_FLAVOR}" = "openwrt" ]; then
 +        if ! grep -q "${file_name}" /etc/config/privoxy; then
-+            sed -i "s%^\(\s*#*\s*list\s\s*${option}\s\s*'default\.${file_type}'\)%\slist\s${option}\t'${file_name}'\n\1%" "/etc/config/privoxy"
++            sed -i "s|^\(\s*#*\s*list\s\s*${option}\s\s*'default\.${file_type}'\)|\tlist\t${option}\t'${file_name}'\n\1|" /etc/config/privoxy
          fi
 +    fi
 +    if test -f "${PRIVOXY_CONF}" && ! grep -q "${file_name}" "${PRIVOXY_CONF}"; then
@@ -30,12 +31,8 @@
 +       	sed "s/^\(#*\s*${option}\s*default\.${file_type}\)/${option}\t${file_name}\n\1/" "${PRIVOXY_CONF}" > "${TMPDIR}/config" 2> /dev/null
          debug 0 "... modification done."
          debug 0 "Installing new config ..."
--        copy "${TMPDIR}/config" "${PRIVOXY_CONF}"
-+       	copy "${TMPDIR}/config" "${PRIVOXY_CONF}" 2> /dev/null
-         debug 0 "... installation done"
-     fi
- }
-@@ -129,7 +129,7 @@ function get_config_path() {
+         copy "${TMPDIR}/config" "${PRIVOXY_CONF}"
+@@ -129,7 +128,7 @@ function get_config_path() {
                  ;;
          esac
          if [ "${OS_FLAVOR}" = "openwrt" ]; then
@@ -44,11 +41,40 @@
          fi
          # backwards compatibility
          if [ -f "/etc/conf.d/privoxy-blacklist" ]; then
-@@ -205,41 +205,30 @@ function prepare() {
+@@ -205,41 +204,36 @@ function prepare() {
      if [[ ! -f "${SCRIPTCONF}" ]]; then
          info "No config found in ${SCRIPTCONF}. Creating default one and exiting because you might have to adjust it."
          cat > "${SCRIPTCONF}" << EOF
 -# Config of privoxy-blocklist
+++
+++config blocklist 'blocklist'
++	# array of URL for AdblockPlus lists
++	#  for more sources just add it within the round brackets
++	list URLS 'https://easylist-downloads.adblockplus.org/fanboy-social.txt'
++	list URLS 'https://easylist-downloads.adblockplus.org/easyprivacy.txt'
++	list URLS 'https://easylist-downloads.adblockplus.org/easylist.txt'
++	list URLS 'https://secure.fanboy.co.nz/fanboy-annoyance.txt'
++
++	# array of content filters to convert
++	#  for supported values check: privoxy-blocklist.sh
++	list FILTERS 'attribute_global_name'
++	list FILTERS 'attribute_global_exact'
++	list FILTERS 'attribute_global_contain'
++	list FILTERS 'attribute_global_startswith'
++	list FILTERS 'attribute_global_endswith'
++	list FILTERS 'class_global'
++	list FILTERS 'id_global'
++
++	option PRIVOXY_USER 'root'
++	option PRIVOXY_GROUP 'root'
++	option PRIVOXY_CONF '/var/etc/privoxy.conf'
++	# Debug-level
++	#   -1 = quiet
++	#    0 = normal
++	#    1 = verbose
++	#    2 = more verbose (debugging)
++	#    3 = incredibly loud (function debugging)
++	option DBG '0'
  
 -# array of URL for AdblockPlus lists
 -#  for more sources just add it within the round brackets
@@ -83,33 +109,10 @@
 -#    2 = more verbose (debugging)
 -#    3 = incredibly loud (function debugging)
 -DBG=0
-+config blocklist 'blocklist'
-+	# array of URL for AdblockPlus lists
-+	#  for more sources just add it within the round brackets
-+	list URLS 'https://easylist-downloads.adblockplus.org/easylistgermany.txt'
-+	list URLS 'https://easylist-downloads.adblockplus.org/easylist.txt'
-+
-+	# array of content filters to convert
-+	#   for supported values check: $0 -h
-+	#   empty by default to deactivate as content filters slowdown privoxy a lot
-+	#list FILTERS ''
-+
-+	option PRIVOXY_USER 'root'
-+	option PRIVOXY_GROUP 'root'
-+	option PRIVOXY_CONF '/var/etc/privoxy.conf'
-+
-+	# Debug-level
-+	#   -1 = quiet
-+	#    0 = normal
-+	#    1 = verbose
-+	#    2 = more verbose (debugging)
-+	#    3 = incredibly loud (function debugging)
-+	option DBG '0'
-+
  EOF
          exit 2
      fi
-@@ -248,8 +237,17 @@ EOF
+@@ -248,8 +242,17 @@ EOF
          debug -1 "Can't read ${SCRIPTCONF}. Permission denied."
      fi
  
@@ -128,7 +131,7 @@
      if [ -n "${OPT_DBG:-}" ]; then
          DBG="${OPT_DBG}"
      fi
-@@ -258,12 +256,6 @@ EOF
+@@ -258,12 +261,6 @@ EOF
      fi
      debug 2 "Content filters: ${OPT_FILTERS[*]:-disabled}"
  
@@ -141,7 +144,7 @@
      # set command to be run on exit
      if [ "${DBG}" -gt 2 ]; then
          trap - INT TERM EXIT
-@@ -291,7 +283,7 @@ EOF
+@@ -291,7 +288,7 @@ EOF
      fi
  
      # set privoxy config dir
@@ -150,7 +153,7 @@
  }
  
  function debug() {
-@@ -852,9 +844,6 @@ esac
+@@ -852,9 +849,6 @@ esac
  # loop for options
  while getopts ":c:f:hrqv:V" opt; do
      case "${opt}" in

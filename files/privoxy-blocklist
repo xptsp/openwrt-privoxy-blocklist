@@ -1,14 +1,20 @@
 
 config blocklist 'blocklist'
 	# array of URL for AdblockPlus lists
-	#  for more sources just add it within the round brackets
-	list URLS 'https://easylist-downloads.adblockplus.org/easylistgermany.txt'
+	list URLS 'https://easylist-downloads.adblockplus.org/fanboy-social.txt'
+	list URLS 'https://easylist-downloads.adblockplus.org/easyprivacy.txt'
 	list URLS 'https://easylist-downloads.adblockplus.org/easylist.txt'
+	list URLS 'https://secure.fanboy.co.nz/fanboy-annoyance.txt'
 
 	# array of content filters to convert
 	#   for supported values check: $0 -h
-	#   empty by default to deactivate as content filters slowdown privoxy a lot
-	#list FILTERS ''
+	list FILTERS 'attribute_global_name'
+	list FILTERS 'attribute_global_exact'
+	list FILTERS 'attribute_global_contain'
+	list FILTERS 'attribute_global_startswith'
+	list FILTERS 'attribute_global_endswith'
+	list FILTERS 'class_global'
+	list FILTERS 'id_global'
 
 	option PRIVOXY_USER 'root'
 	option PRIVOXY_GROUP 'root'
