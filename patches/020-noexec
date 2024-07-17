@@ -1,0 +1,10 @@
+--- a/privoxy-blocklist.sh
++++ b/privoxy-blocklist.sh
+@@ -113,7 +113,6 @@ function copy() {
+     fi
+     cp "${VERBOSE[@]}" "${source_path}" "${target_path}"
+     chown "${PRIVOXY_USER}:${PRIVOXY_GROUP}" "${full_target_path}"
+-    chmod a+x "${full_target_path}"
+ }
+ 
+ function get_config_path() {

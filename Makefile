@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=privoxy-blocklist
 PKG_VERSION:=0.4.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_LICENSE:=unlicense
 
 PKG_SOURCE_PROTO:=git
