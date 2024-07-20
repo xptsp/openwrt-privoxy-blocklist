@@ -2,8 +2,9 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=privoxy-blocklist
 PKG_VERSION:=0.4.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_LICENSE:=unlicense
+PKG_MAINTAINER:=Douglas Orend <doug.orend2@gmail.com>
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/Andrwe/privoxy-blocklist.git
